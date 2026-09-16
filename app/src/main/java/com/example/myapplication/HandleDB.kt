@@ -16,20 +16,6 @@ import androidx.room.TypeConverters
 import kotlinx.serialization.Serializable
 
 
-@Serializable
-data class OnlineStudySet(
-    val id: Long? = null,
-    val name: String,
-    val subject: String,
-    val description: String
-)
-@Serializable
-data class OnlineStudySetConn(
-    val id: Long? = null,
-    val term: String,
-    val definition: String,
-    val studyset_id: Long
-)
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Entity

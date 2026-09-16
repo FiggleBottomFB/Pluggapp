@@ -26,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.room.Room
 import com.example.myapplication.ui.theme.MyApplicationTheme
@@ -88,7 +89,7 @@ class StudySetScreen : ComponentActivity() {
                         else{Button(onClick = {playflashcard = false}) { Text("Avbryt") }}
 
                         if(playflashcard){
-                            flascard(currentstudyset, flashCardPairs)
+                            flashcard(currentstudyset, flashCardPairs)
                         }
                         else{
                             editFlashCard(currentstudyset, flashCardPairs)
@@ -101,10 +102,17 @@ class StudySetScreen : ComponentActivity() {
 }
 
 @Composable
-fun flascard(studyset: StudySet?, pairs: List<Pair<String, String>>){
+fun flashcard(studyset: StudySet?, pairs: List<Pair<String, String>>){
     var shuffledPairs = remember { pairs.shuffled().toMutableStateList() }
+    var nextRoundPairs = remember { mutableStateListOf<Pair<String, String>>() }
     var currentTerm by remember {mutableStateOf("")}
-    if (shuffledPairs.isNotEmpty()) {
+    var startNextTerm by remember { mutableStateOf(false) }
+    var answerText by remember {mutableStateOf("")}
+    var answerColor by remember { mutableStateOf(Color.White) }
+    var completedSet by remember { mutableStateOf(false) }
+
+    if (!completedSet || shuffledPairs.isNotEmpty()) {
+
 
         val currentPair = shuffledPairs.first()
 
@@ -118,19 +126,41 @@ fun flascard(studyset: StudySet?, pairs: List<Pair<String, String>>){
                 label = { Text("Term") }
             )
 
-            Button(
-                onClick = {
-                    if (currentTerm.equals(currentPair.first, ignoreCase = true)) {
-                        shuffledPairs.removeAt(0)
+            if(!startNextTerm) {
+                Button(
+                    onClick = {
+                        if (currentTerm.equals(currentPair.first, ignoreCase = true)) {
+                            answerText = "Du svarade rätt"
+                            answerColor = Color.Green
+                        } else {
+                            val wrongCard = shuffledPairs.removeAt(0)
+                            nextRoundPairs.add(wrongCard)
+                            answerText = "Du svarade fel"
+                            answerColor = Color.Red
+                        }
+                        startNextTerm = true
                     }
-
-                    else {
-                        val wrongCard = shuffledPairs.removeAt(0)
-                        shuffledPairs.add(wrongCard)
-                    }
-                    currentTerm = ""
+                ) { Text("Svara") }
+            }
+            else{
+                Text(text = answerText, color = answerColor)
+                if(answerColor == Color.Red){
+                    Text("Rätt svar: ${shuffledPairs[0]}")
                 }
-            ) { Text("Svara") }
+                Button(
+                    onClick = {
+                        shuffledPairs.removeAt(0)
+                        currentTerm = ""
+                        if(shuffledPairs.isEmpty()){
+                            shuffledPairs = nextRoundPairs
+                            nextRoundPairs.removeAll { true }
+                        }
+                        if(shuffledPairs.isEmpty() && nextRoundPairs.isEmpty()){
+                            completedSet = true
+                        }
+                    }
+                ) { Text("Nästa") }
+            }
         }
     }
 
