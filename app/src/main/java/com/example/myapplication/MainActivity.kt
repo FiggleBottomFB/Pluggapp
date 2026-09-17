@@ -43,7 +43,6 @@ class MainActivity : ComponentActivity() {
         setContent {
 
             MyApplicationTheme {
-                LoginScreen()
                 // call db and functions
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Column(
@@ -65,6 +64,16 @@ class MainActivity : ComponentActivity() {
                             onClick = {
                                 val intent = Intent(
                                     this@MainActivity,
+                                    Costscreen::class.java
+                                )
+                                startActivity(intent) },
+                            modifier = Modifier.padding(bottom = 16.dp)
+                            ) { Text("Kostnader") }
+
+                        Button(
+                            onClick = {
+                                val intent = Intent(
+                                    this@MainActivity,
                                     StudyScreen::class.java
                                 )
                                 startActivity(intent) },
@@ -77,51 +86,4 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable
-fun LoginScreen() {
-
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-
-    val scope = rememberCoroutineScope()
-
-    Column {
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") }
-        )
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") }
-        )
-
-        Button(
-            onClick = {
-
-                scope.launch {
-
-                    try {
-
-                        SupabaseManager.client.auth.signUpWith(
-                            io.github.jan.supabase.gotrue.providers.builtin.Email
-                        ) {
-
-                            this.email = email
-                            this.password = password
-                        }
-
-                    } catch(e: Exception) {
-                        println(e.message)
-                    }
-                }
-            }
-        ) {
-            Text("Create Account")
-        }
-    }
-}
 

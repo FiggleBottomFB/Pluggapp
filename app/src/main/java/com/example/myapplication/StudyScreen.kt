@@ -90,24 +90,6 @@ class StudyScreen : ComponentActivity() {
                     mutableStateOf<List<StudySet>>(emptyList())
                 }
 
-                var studysetssupa by remember {
-                    mutableStateOf<List<OnlineStudySet>>(emptyList())
-                }
-
-                // Load exams once
-                LaunchedEffect(Unit) {
-                    studysets = db.studySetDao().getAll()
-
-                    try {
-                        studysetssupa = SupabaseManager.client
-                            .from("studysets")
-                            .select()
-                            .decodeList<OnlineStudySet>()
-
-                    } catch(e: Exception) {
-                        println(e.message)
-                    }
-                }
 
 
                 Scaffold() {
@@ -118,52 +100,6 @@ class StudyScreen : ComponentActivity() {
                                     scope.launch {
                                         // insert the studyset in local db
                                         val localId = db.studySetDao().insert(studyset)
-
-                                        try {
-                                            // 1. Insert the parent study set using a simple String-only map (this works fine)
-                                            val inserted = SupabaseManager.client
-                                                .from("studysets")
-                                                .insert(
-                                                    mapOf(
-                                                        "name" to studyset.name,
-                                                        "subject" to studyset.subject,
-                                                        "description" to studyset.description
-                                                    )
-                                                ) { select() }
-                                                .decodeSingle<OnlineStudySet>()
-
-                                            // 2. Get the generated ID from Supabase
-                                            val studysetId = inserted.id!!
-
-                                            // 3. Convert your terms and definitions into a list of your serializable data class
-                                            val flashcardsData = terms.zip(definitions)
-                                                .filter { (term, def) -> term.isNotBlank() && def.isNotBlank() }
-                                                .map { (term, def) ->
-                                                    OnlineStudySetConn(
-                                                        term = term,
-                                                        definition = def,
-                                                        studyset_id = studysetId
-                                                    )
-                                                }
-
-                                            // 4. Send the whole list to Supabase in ONE efficient network call
-                                            if (flashcardsData.isNotEmpty()) {
-                                                SupabaseManager.client
-                                                    .from("flashcards")
-                                                    .insert(flashcardsData)
-                                            }
-
-                                            // Refresh your online state list
-                                            studysetssupa = SupabaseManager.client
-                                                .from("studysets")
-                                                .select()
-                                                .decodeList()
-
-                                        } catch (e: Exception) {
-                                            // This will catch any remaining database or schema issues
-                                            println("Något oväntat gick fel: ${e.message}")
-                                            e.printStackTrace()
-                                        }
 
                                         studysets = db.studySetDao().getAll()
                                         showAddStudySet = false
@@ -184,8 +120,7 @@ class StudyScreen : ComponentActivity() {
                             }) { Text("Lägg till") }
                             DisplayStudySets(
                                 studysets,
-                                studysetssupa,
-                                onOpen = { studyset, onlinestudyset ->
+                                onOpen = { studyset ->
 
                                     if(studyset != null){
                                         val intent = Intent(
@@ -197,42 +132,13 @@ class StudyScreen : ComponentActivity() {
 
                                         startActivity(intent)
                                     }
-                                    else if(onlinestudyset != null){
-                                        val intent = Intent(
-                                            this@StudyScreen,
-                                            StudySetScreen::class.java
-                                        )
-
-                                        intent.putExtra("studyset_id", onlinestudyset.id)
-
-                                        startActivity(intent)
-                                    }
 
                                 },
-                                onDelete = { studyset, onlinestudyset ->
+                                onDelete = { studyset ->
                                     scope.launch {
                                         if (studyset != null) {
                                             db.studySetDao().delete(studyset.id)
                                             studysets = db.studySetDao().getAll()
-                                        } else if (onlinestudyset != null) {
-                                            try {
-                                                SupabaseManager.client
-                                                    .from("studysets")
-                                                    .delete {
-                                                        filter {
-                                                            eq("id", onlinestudyset.id!!)
-                                                        }
-                                                    }
-
-                                                // refresh list after delete
-                                                studysetssupa = SupabaseManager.client
-                                                    .from("studysets")
-                                                    .select()
-                                                    .decodeList()
-
-                                            } catch (e: Exception) {
-                                                println("Delete failed: ${e.message}")
-                                            }
                                         }
                                     }
                                 }
@@ -371,84 +277,44 @@ fun DisplayAddStudySet(onAdd: (StudySet, List<String>, List<String>) -> Unit) {
 }
 
 @Composable
-fun DisplayStudySets(studysets: List<StudySet>, supastudysets: List<OnlineStudySet>, onOpen: (StudySet?, OnlineStudySet?) -> Unit, onDelete: (StudySet?, OnlineStudySet?) -> Unit) {
+fun DisplayStudySets(studysets: List<StudySet>, onOpen: (StudySet?) -> Unit, onDelete: (StudySet?) -> Unit) {
 
-    val useLocal = supastudysets.isEmpty()
 
     LazyColumn {
-
-        if(!useLocal) {
-            items(supastudysets) { studyset ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    onClick = {
-                        onOpen(null, studyset)
+        items(studysets) { studyset ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                onClick = {
+                    onOpen(studyset)
+                }
+            ) {
+                Row {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = studyset.name,
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                        Text(
+                            text = studyset.subject,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
-                ) {
-                    Row() {
-                        Column(
-                            modifier = Modifier.padding(16.dp)
-                        ) {
-                            Text(
-                                text = studyset.name,
-                                style = MaterialTheme.typography.headlineSmall
-                            )
-                            Text(
-                                text = studyset.subject,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
+
+                    IconButton(
+                        onClick = {
+                            onDelete(studyset)
                         }
-                        IconButton(
-                            onClick = {
-                                onDelete(null, studyset)
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Delete"
-                            )
-                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete"
+                        )
                     }
                 }
             }
         }
-        else {
-            items(studysets) { studyset ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    onClick = {
-                        onOpen(studyset, null)
-                    }
-                ) {
-                    Row {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = studyset.name,
-                                style = MaterialTheme.typography.headlineSmall
-                            )
-                            Text(
-                                text = studyset.subject,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
 
-                        IconButton(
-                            onClick = {
-                                onDelete(studyset, null)
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Delete"
-                            )
-                        }
-                    }
-                }
-            }
-        }
     }
 }

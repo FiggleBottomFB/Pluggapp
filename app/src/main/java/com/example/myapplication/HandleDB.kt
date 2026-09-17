@@ -46,12 +46,44 @@ interface ExamDao {
     suspend fun updateExam(inputID: Int, updateName: String, updateSubject: String, updateDate: LocalDate, updateDescription: String)
 }
 
-
 @Database(entities = [Exam::class], version = 2)
 @TypeConverters(DateConverter::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun examDao(): ExamDao
 }
+
+
+@RequiresApi(Build.VERSION_CODES.O)
+@Entity
+data class MonthCost @RequiresApi(Build.VERSION_CODES.O) constructor(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+    val name: String = "",
+    val cost: Int = 0,
+    val date: LocalDate = LocalDate.now()
+)
+
+@Dao
+interface CostDao {
+    @Insert
+    suspend fun insert(cost: MonthCost)
+
+    @Query("DELETE FROM MonthCost WHERE id = :inputID")
+    suspend fun delete(inputID: Int)
+
+    @Query("SELECT * FROM MonthCost ORDER BY date ASC")
+    suspend fun getAll(): List<MonthCost>
+
+    @Query("SELECT * FROM MonthCost WHERE id = :inputID LIMIT 1")
+    suspend fun getCost(inputID: Int): MonthCost
+}
+
+@Database(entities = [MonthCost::class], version = 2)
+@TypeConverters(DateConverter::class)
+abstract class CostDataBase : RoomDatabase() {
+    abstract fun costDao(): CostDao
+}
+
 
 @Entity
 data class StudySet constructor(
@@ -93,7 +125,6 @@ interface StudySetDao {
 interface StudySetConnDao {
     @Query("INSERT INTO StudySetConn (StudySetId, term, definition) VALUES (:inputId, :inputTerm, :inputDefinition)")
     suspend fun insert(inputId: Int, inputTerm: String, inputDefinition: String)
-
     @Query("SELECT * FROM StudySetConn WHERE studySetId = :inputId")
     suspend fun getAll(inputId: Int): List<StudySetConn>
 }
