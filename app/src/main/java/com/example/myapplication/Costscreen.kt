@@ -146,6 +146,7 @@ fun DisplayAddCost(onAdd: (MonthCost) -> Unit, onClose: () -> Unit){
         mutableStateOf(false)
     }
 
+
     Dialog(onDismissRequest = { onClose() }){
         Card(
             shape = RoundedCornerShape(24.dp),
